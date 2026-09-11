@@ -31,6 +31,7 @@ import {
 } from "./db";
 import { importMarkdownForOrganization } from "./markdownImportDb";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
+import { getTelegramBotInfo } from "./telegram";
 
 const orgId = z.object({ organizationId: z.number().int().positive() });
 const organizationInput = z.object({ name: z.string().trim().min(2).max(180), slug: z.string().trim().min(2).max(180).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/), description: z.string().trim().max(1000).optional() });
@@ -112,6 +113,7 @@ export const appRouter = router({
     }),
   }),
   telegram: router({
+    botInfo: protectedProcedure.query(() => getTelegramBotInfo()),
     connect: protectedProcedure.input(orgId.extend({ chatId: z.string().min(1).max(80) })).mutation(({ ctx, input }) => setVeterinarianTelegramChat(ctx.user.id, input.organizationId, input.chatId)),
     linkCode: protectedProcedure.input(orgId).mutation(({ ctx, input }) => createTelegramLinkCode(ctx.user.id, input.organizationId)),
   }),
