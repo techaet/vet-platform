@@ -205,6 +205,16 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           <SidebarFooter className="p-3">
+            <div className="mb-2 grid grid-cols-2 gap-2 group-data-[collapsible=icon]:grid-cols-1">
+              <Button type="button" variant="outline" size="sm" onClick={toggleTheme} className="h-9 justify-start group-data-[collapsible=icon]:justify-center" title={theme === "dark" ? "Modo claro" : "Modo escuro"}>
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <span className="ml-2 group-data-[collapsible=icon]:hidden">{theme === "dark" ? "Claro" : "Escuro"}</span>
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setLocation("/legal")} className="h-9 justify-start group-data-[collapsible=icon]:justify-center" title="Termos e privacidade">
+                <FileText className="h-4 w-4" />
+                <span className="ml-2 group-data-[collapsible=icon]:hidden">Termos</span>
+              </Button>
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -224,13 +234,6 @@ function DashboardLayoutContent({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
-                  {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                  <span>{theme === "dark" ? "Modo claro" : "Modo escuro"}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLocation("/legal")} className="cursor-pointer">
-                  <FileText className="mr-2 h-4 w-4" /><span>Termos e privacidade</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive"
