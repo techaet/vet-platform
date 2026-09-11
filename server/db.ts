@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertOrganization,
@@ -96,8 +96,8 @@ export async function getOrganizationForUser(userId: number, organizationId: num
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug, description: organizations.description, status: organizations.status, role: organizationMembers.role })
-    .from(organizationMembers).innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
-    .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.status, "active"))).limit(1);
+    .from(organizations).leftJoin(organizationMembers, and(eq(organizationMembers.organizationId, organizations.id), eq(organizationMembers.userId, userId)))
+    .where(and(eq(organizations.id, organizationId), or(eq(organizations.ownerUserId, userId), eq(organizationMembers.status, "active")))).limit(1);
   return result[0];
 }
 
