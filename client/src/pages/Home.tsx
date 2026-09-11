@@ -54,8 +54,8 @@ export default function Home() {
               Base técnica para organizar veterinários, clínicas, pacientes e os próximos fluxos de atendimento.
             </p>
           </div>
-          <Badge variant="secondary" className="w-fit gap-2 px-3 py-1.5">
-            <ShieldCheck className="h-4 w-4 text-primary" /> Fase 1 · base técnica
+            <Badge variant="secondary" className="w-fit gap-2 px-3 py-1.5">
+              <ShieldCheck className="h-4 w-4 text-primary" /> Ambiente protegido
           </Badge>
         </section>
 
