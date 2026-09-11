@@ -50,6 +50,13 @@
       "when": 1789097573880,
       "tag": "0006_yellow_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1789098391340,
+      "tag": "0007_opposite_landau",
+      "breakpoints": true
     }
   ]
 }
