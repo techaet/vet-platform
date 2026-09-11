@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertOrganization,
@@ -310,6 +310,21 @@ export async function createTelegramAppointment(input: { organizationId: number;
   const result = await db.insert(appointments).values({ ...input, addressText: input.addressText || null, notes: input.notes || null });
   const rows = await db.select().from(appointments).where(eq(appointments.id, Number(result[0].insertId))).limit(1);
   return rows[0];
+}
+
+export async function listAppointments(userId: number, organizationId: number, from?: Date, to?: Date) {
+  await requireOrganizationMember(userId, organizationId);
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [eq(appointments.organizationId, organizationId)];
+  if (from) conditions.push(gte(appointments.scheduledAt, from));
+  if (to) conditions.push(lte(appointments.scheduledAt, to));
+  return db.select({ appointment: appointments, patientName: patients.name, ownerName: owners.name })
+    .from(appointments)
+    .innerJoin(patients, eq(appointments.patientId, patients.id))
+    .innerJoin(owners, eq(appointments.ownerId, owners.id))
+    .where(and(...conditions))
+    .orderBy(asc(appointments.scheduledAt));
 }
 
 export async function createOwnerObservation(input: { organizationId: number; patientId: number; veterinarianUserId: number; content: string; originalAudioKey?: string }) {

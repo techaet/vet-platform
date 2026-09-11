@@ -1,0 +1,20 @@
+import DashboardLayout from "@/components/DashboardLayout";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { trpc } from "@/lib/trpc";
+import { CalendarDays, Clock3, MapPin } from "lucide-react";
+
+function formatDate(value: Date | string) {
+  return new Date(value).toLocaleString("pt-BR", { dateStyle: "medium", timeStyle: "short" });
+}
+
+export default function Agenda() {
+  const organizations = trpc.organization.mine.useQuery();
+  const organizationId = organizations.data?.[0]?.id;
+  const appointments = trpc.appointment.list.useQuery(
+    { organizationId: organizationId ?? 0 },
+    { enabled: Boolean(organizationId) }
+  );
+
+  return <DashboardLayout><div className="mx-auto w-full max-w-4xl space-y-6"><section className="border-b border-border/70 pb-6"><p className="text-sm font-medium uppercase tracking-[0.18em] text-primary">Fase 5</p><h1 className="mt-2 flex items-center gap-3 text-2xl font-semibold sm:text-3xl"><CalendarDays className="h-7 w-7 text-primary" />Agenda</h1><p className="mt-2 text-sm text-muted-foreground sm:text-base">Consultas agendadas pelo Telegram, com horário e endereço do atendimento.</p></section>{!organizationId && !organizations.isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Crie uma organização para visualizar a agenda.</CardContent></Card> : null}{appointments.isLoading ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Carregando consultas...</CardContent></Card> : null}{appointments.data?.length === 0 ? <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma consulta agendada.</CardContent></Card> : null}<div className="grid gap-4">{appointments.data?.map(({ appointment, patientName, ownerName }) => <Card key={appointment.id}><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-lg">{patientName}</CardTitle><p className="text-sm text-muted-foreground">Proprietário: {ownerName}</p></div><Badge variant={appointment.status === "canceled" ? "destructive" : "secondary"}>{appointment.status === "scheduled" ? "Agendada" : appointment.status === "confirmed" ? "Confirmada" : appointment.status === "completed" ? "Concluída" : "Cancelada"}</Badge></div></CardHeader><CardContent className="grid gap-2 text-sm"><p className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary" />{formatDate(appointment.scheduledAt)}</p><p className="flex items-start gap-2"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{appointment.addressText || "Endereço não informado"}</p>{appointment.notes ? <p className="rounded-lg bg-muted p-3 text-muted-foreground">{appointment.notes}</p> : null}</CardContent></Card>)}</div></div></DashboardLayout>;
+}

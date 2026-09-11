@@ -9,6 +9,7 @@ import Patients from "./pages/Patients";
 import PatientDetail from "./pages/PatientDetail";
 import Admin from "./pages/Admin";
 import Telegram from "./pages/Telegram";
+import Agenda from "./pages/Agenda";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -19,6 +20,7 @@ function Router() {
       <Route path={"/patients/:id"} component={PatientDetail} />
       <Route path={"/admin"} component={Admin} />
       <Route path={"/telegram"} component={Telegram} />
+      <Route path={"/agenda"} component={Agenda} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -269,11 +269,25 @@ export const appointments = mysqlTable("appointments", {
   scheduledAt: timestamp("scheduledAt").notNull(),
   addressText: text("addressText"),
   notes: text("notes"),
+  calendarEventId: varchar("calendarEventId", { length: 255 }),
   status: mysqlEnum("status", ["scheduled", "confirmed", "completed", "canceled"]).default("scheduled").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => ({
   vetDateIndex: index("appointments_vet_date_index").on(table.veterinarianUserId, table.scheduledAt),
+}));
+
+export const appointmentReminders = mysqlTable("appointmentReminders", {
+  id: int("id").autoincrement().primaryKey(),
+  appointmentId: int("appointmentId").notNull(),
+  channel: mysqlEnum("channel", ["telegram", "whatsapp", "email"]).notNull(),
+  reminderType: mysqlEnum("reminderType", ["vet_30m", "owner_1d"]).notNull(),
+  scheduledFor: timestamp("scheduledFor").notNull(),
+  sentAt: timestamp("sentAt"),
+  status: mysqlEnum("status", ["pending", "sent", "failed"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  dueIndex: index("appointment_reminders_due_index").on(table.status, table.scheduledFor),
 }));
 
 export const ownerObservations = mysqlTable("ownerObservations", {
@@ -324,3 +338,5 @@ export type PatientAttachment = typeof patientAttachments.$inferSelect;
 export type VeterinarianAdminDocument = typeof veterinarianAdminDocuments.$inferSelect;
 export type PrescriptionTemplate = typeof prescriptionTemplates.$inferSelect;
 export type Prescription = typeof prescriptions.$inferSelect;
+export type Appointment = typeof appointments.$inferSelect;
+export type AppointmentReminder = typeof appointmentReminders.$inferSelect;

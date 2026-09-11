@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Bot, LayoutDashboard, LogOut, PanelLeft, Settings, Users } from "lucide-react";
+import { Bot, CalendarDays, LayoutDashboard, LogOut, PanelLeft, Settings, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -30,6 +30,7 @@ import { Button } from "./ui/button";
 const menuItems = [
   { icon: LayoutDashboard, label: "Visão geral", path: "/" },
   { icon: Users, label: "Pacientes", path: "/patients" },
+  { icon: CalendarDays, label: "Agenda", path: "/agenda" },
   { icon: Settings, label: "Administração", path: "/admin" },
   { icon: Bot, label: "Telegram", path: "/telegram" },
 ];
