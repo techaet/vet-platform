@@ -22,10 +22,10 @@ export default function Admin() {
   const [fileName, setFileName] = useState("perfil-veterinario.md");
   const [content, setContent] = useState("# Perfil profissional\n\n## Experiência\n\n## Formação\n\n## Tom de voz\n\n## Redes sociais\n\n## Vade-mécum de medicações\n");
   const [message, setMessage] = useState("");
-  const [form, setForm] = useState({ businessName: "", professionalName: "", registration: "", phone: "", professionalAddress: "", headerText: "", footerText: "", primaryColor: "#087f70" });
+  const [form, setForm] = useState({ businessName: "", professionalName: "", registration: "", phone: "", professionalAddress: "", headerText: "", footerText: "", primaryColor: "#b8892d" });
 
   useEffect(() => { const current = documents.data?.[0]; if (current) { setFileName(current.fileName); setContent(current.content); } }, [documents.data]);
-  useEffect(() => { if (template.data) setForm({ businessName: template.data.businessName || "", professionalName: template.data.professionalName || "", registration: template.data.registration || "", phone: template.data.phone || "", professionalAddress: template.data.professionalAddress || "", headerText: template.data.headerText || "", footerText: template.data.footerText || "", primaryColor: template.data.primaryColor || "#087f70" }); }, [template.data]);
+  useEffect(() => { if (template.data) setForm({ businessName: template.data.businessName || "", professionalName: template.data.professionalName || "", registration: template.data.registration || "", phone: template.data.phone || "", professionalAddress: template.data.professionalAddress || "", headerText: template.data.headerText || "", footerText: template.data.footerText || "", primaryColor: template.data.primaryColor || "#b8892d" }); }, [template.data]);
 
   const loadFile = async (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; setFileName(file.name); setContent(await file.text()); event.target.value = ""; };
   const submitDocument = (event: React.FormEvent) => { event.preventDefault(); if (organizationId) saveDocument.mutate({ organizationId, fileName, content }); };
