@@ -15,6 +15,10 @@ import {
   owners,
   patientAttachments,
   patients,
+  appointments,
+  ownerObservations,
+  telegramMessages,
+  telegramSessions,
   veterinarianProfiles,
   users,
 } from "../drizzle/schema";
@@ -250,4 +254,68 @@ export async function setPrescriptionPdf(userId: number, input: { organizationId
   await db.update(prescriptions).set({ pdfKey: input.pdfKey, pdfUrl: input.pdfUrl, updatedAt: new Date() }).where(and(eq(prescriptions.id, input.prescriptionId), eq(prescriptions.organizationId, input.organizationId), eq(prescriptions.veterinarianUserId, userId)));
   const updated = await db.select().from(prescriptions).where(eq(prescriptions.id, input.prescriptionId)).limit(1);
   return updated[0];
+}
+
+export async function getVeterinarianByTelegramChat(telegramChatId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ userId: veterinarianProfiles.userId, organizationId: veterinarianProfiles.organizationId, displayName: veterinarianProfiles.displayName, chatId: veterinarianProfiles.telegramChatId })
+    .from(veterinarianProfiles).where(eq(veterinarianProfiles.telegramChatId, telegramChatId)).limit(1);
+  return rows[0];
+}
+
+export async function setVeterinarianTelegramChat(userId: number, organizationId: number, telegramChatId: string) {
+  await requireOrganizationMember(userId, organizationId);
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(veterinarianProfiles).set({ telegramChatId, updatedAt: new Date() }).where(and(eq(veterinarianProfiles.userId, userId), eq(veterinarianProfiles.organizationId, organizationId)));
+  const rows = await db.select().from(veterinarianProfiles).where(and(eq(veterinarianProfiles.userId, userId), eq(veterinarianProfiles.organizationId, organizationId))).limit(1);
+  return rows[0];
+}
+
+export async function saveTelegramMessage(input: { telegramChatId: string; telegramMessageId?: number; organizationId?: number; veterinarianUserId?: number; direction: "inbound" | "outbound"; messageType: string; text?: string; rawPayload?: string }) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(telegramMessages).values({ ...input, telegramMessageId: input.telegramMessageId || null, organizationId: input.organizationId || null, veterinarianUserId: input.veterinarianUserId || null, text: input.text || null, rawPayload: input.rawPayload || null });
+}
+
+export async function getTelegramSession(telegramChatId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(telegramSessions).where(eq(telegramSessions.telegramChatId, telegramChatId)).limit(1);
+  return rows[0];
+}
+
+export async function saveTelegramSession(input: { telegramChatId: string; organizationId?: number; veterinarianUserId?: number; mode: "idle" | "appointment" | "record" | "owner_observation"; ownerId?: number; patientId?: number }) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(telegramSessions).values({ ...input, organizationId: input.organizationId || null, veterinarianUserId: input.veterinarianUserId || null, ownerId: input.ownerId || null, patientId: input.patientId || null }).onDuplicateKeyUpdate({ set: { organizationId: input.organizationId || null, veterinarianUserId: input.veterinarianUserId || null, mode: input.mode, ownerId: input.ownerId || null, patientId: input.patientId || null, updatedAt: new Date() } });
+}
+
+export async function findOwnerByName(organizationId: number, name: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(owners).where(and(eq(owners.organizationId, organizationId), eq(owners.name, name))).limit(5);
+}
+
+export async function listOwnerPatients(organizationId: number, ownerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(patients).where(and(eq(patients.organizationId, organizationId), eq(patients.ownerId, ownerId))).orderBy(asc(patients.name));
+}
+
+export async function createTelegramAppointment(input: { organizationId: number; ownerId: number; patientId: number; veterinarianUserId: number; scheduledAt: Date; addressText?: string; notes?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const result = await db.insert(appointments).values({ ...input, addressText: input.addressText || null, notes: input.notes || null });
+  const rows = await db.select().from(appointments).where(eq(appointments.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
+}
+
+export async function createOwnerObservation(input: { organizationId: number; patientId: number; veterinarianUserId: number; content: string; originalAudioKey?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const result = await db.insert(ownerObservations).values({ ...input, originalAudioKey: input.originalAudioKey || null });
+  const rows = await db.select().from(ownerObservations).where(eq(ownerObservations.id, Number(result[0].insertId))).limit(1);
+  return rows[0];
 }

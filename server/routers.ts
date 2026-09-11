@@ -23,6 +23,7 @@ import {
   saveAdminDocument,
   savePrescriptionTemplate,
   setPrescriptionPdf,
+  setVeterinarianTelegramChat,
 } from "./db";
 import { importMarkdownForOrganization } from "./markdownImportDb";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
@@ -96,6 +97,9 @@ export const appRouter = router({
       const updated = await setPrescriptionPdf(ctx.user.id, { organizationId: input.organizationId, prescriptionId: result.prescription.id, pdfKey: stored.key, pdfUrl: stored.url });
       return { ...result, prescription: updated };
     }),
+  }),
+  telegram: router({
+    connect: protectedProcedure.input(orgId.extend({ chatId: z.string().min(1).max(80) })).mutation(({ ctx, input }) => setVeterinarianTelegramChat(ctx.user.id, input.organizationId, input.chatId)),
   }),
 });
 

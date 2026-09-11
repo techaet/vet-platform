@@ -53,6 +53,7 @@ export const veterinarianProfiles = mysqlTable("veterinarianProfiles", {
   displayName: varchar("displayName", { length: 180 }),
   phone: varchar("phone", { length: 40 }),
   professionalRegistration: varchar("professionalRegistration", { length: 80 }),
+  telegramChatId: varchar("telegramChatId", { length: 80 }),
   bio: text("bio"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -257,6 +258,59 @@ export const prescriptionItems = mysqlTable("prescriptionItems", {
   duration: varchar("duration", { length: 120 }),
   quantity: varchar("quantity", { length: 80 }),
   instructions: text("instructions"),
+});
+
+export const appointments = mysqlTable("appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  ownerId: int("ownerId").notNull(),
+  patientId: int("patientId").notNull(),
+  veterinarianUserId: int("veterinarianUserId").notNull(),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  addressText: text("addressText"),
+  notes: text("notes"),
+  status: mysqlEnum("status", ["scheduled", "confirmed", "completed", "canceled"]).default("scheduled").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  vetDateIndex: index("appointments_vet_date_index").on(table.veterinarianUserId, table.scheduledAt),
+}));
+
+export const ownerObservations = mysqlTable("ownerObservations", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  patientId: int("patientId").notNull(),
+  veterinarianUserId: int("veterinarianUserId").notNull(),
+  content: text("content").notNull(),
+  originalAudioKey: varchar("originalAudioKey", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const telegramMessages = mysqlTable("telegramMessages", {
+  id: int("id").autoincrement().primaryKey(),
+  telegramChatId: varchar("telegramChatId", { length: 80 }).notNull(),
+  telegramMessageId: int("telegramMessageId"),
+  organizationId: int("organizationId"),
+  veterinarianUserId: int("veterinarianUserId"),
+  direction: mysqlEnum("direction", ["inbound", "outbound"]).notNull(),
+  messageType: varchar("messageType", { length: 40 }).notNull(),
+  text: text("text"),
+  rawPayload: text("rawPayload"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, table => ({
+  chatIndex: index("telegram_messages_chat_index").on(table.telegramChatId, table.createdAt),
+}));
+
+export const telegramSessions = mysqlTable("telegramSessions", {
+  id: int("id").autoincrement().primaryKey(),
+  telegramChatId: varchar("telegramChatId", { length: 80 }).notNull().unique(),
+  organizationId: int("organizationId"),
+  veterinarianUserId: int("veterinarianUserId"),
+  mode: mysqlEnum("mode", ["idle", "appointment", "record", "owner_observation"]).default("idle").notNull(),
+  ownerId: int("ownerId"),
+  patientId: int("patientId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
