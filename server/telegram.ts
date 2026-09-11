@@ -27,8 +27,112 @@ import {
   redeemTelegramLinkCode,
 } from "./db";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
+import { invokeLLM } from "./_core/llm";
+import { createOwner, createOwnerAddress, createPatient } from "./db";
 
 const telegramApi = () => `https://api.telegram.org/bot${ENV.telegramBotToken}`;
+const normalizeLabel = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+type FreeConsultation = {
+  ownerName: string;
+  ownerPhone?: string;
+  ownerEmail?: string;
+  patientName: string;
+  species?: string;
+  breed?: string;
+  sex?: "male" | "female" | "unknown";
+  birthDate?: string;
+  address?: string;
+  summary: string;
+  recordTitle?: string;
+  followUp?: string;
+};
+
+const pendingConsultations = new Map<string, { vet: { userId: number; organizationId: number }; data: FreeConsultation; patientId?: number; ownerId?: number; audioKey?: string }>();
+
+async function extractFreeConsultation(text: string): Promise<FreeConsultation> {
+  const result = await invokeLLM({
+    model: "gpt-5-mini",
+    messages: [
+      { role: "system", content: "Extraia dados de um relato veterinário em português. Não invente dados. Retorne somente JSON conforme o schema. O resumo deve preservar fatos clínicos informados pelo veterinário, sem criar diagnóstico." },
+      { role: "user", content: text },
+    ],
+    outputSchema: {
+      name: "free_veterinary_consultation",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          ownerName: { type: "string" }, ownerPhone: { type: ["string", "null"] }, ownerEmail: { type: ["string", "null"] },
+          patientName: { type: "string" }, species: { type: ["string", "null"] }, breed: { type: ["string", "null"] },
+          sex: { type: ["string", "null"], enum: ["male", "female", "unknown", null] }, birthDate: { type: ["string", "null"] },
+          address: { type: ["string", "null"] }, summary: { type: "string" }, recordTitle: { type: ["string", "null"] }, followUp: { type: ["string", "null"] },
+        },
+        required: ["ownerName", "ownerPhone", "ownerEmail", "patientName", "species", "breed", "sex", "birthDate", "address", "summary", "recordTitle", "followUp"],
+      },
+    },
+  });
+  const content = result.choices[0]?.message.content;
+  if (!content || Array.isArray(content)) throw new Error("Não foi possível interpretar o áudio");
+  const parsed = JSON.parse(content) as FreeConsultation;
+  if (!parsed.ownerName || !parsed.patientName || !parsed.summary) throw new Error("Não identifiquei proprietário, animal ou relato clínico suficiente");
+  return parsed;
+}
+
+function consultationSummary(data: FreeConsultation, isNew: boolean) {
+  return `${isNew ? "Novo cadastro identificado" : "Atendimento identificado"}\n\nProprietário: ${data.ownerName}\nAnimal: ${data.patientName}${data.species ? `\nEspécie: ${data.species}` : ""}${data.breed ? `\nRaça: ${data.breed}` : ""}\n\nResumo: ${data.summary}${data.followUp ? `\n\nRetorno: ${data.followUp}` : ""}\n\nResponda SIM para confirmar e registrar no prontuário, ou NÃO para cancelar.`;
+}
+
+async function confirmFreeConsultation(chatId: string, confirmation: string) {
+  const pending = pendingConsultations.get(chatId);
+  if (!pending) return false;
+  const answer = normalizeLabel(confirmation);
+  if (["nao", "não", "cancelar", "cancelei"].includes(answer)) {
+    pendingConsultations.delete(chatId);
+    await sendMessage(chatId, "Atendimento cancelado. Nenhuma alteração foi feita no prontuário.");
+    return true;
+  }
+  if (!["sim", "s", "confirmar", "confirmo"].includes(answer)) {
+    await sendMessage(chatId, "Responda SIM para registrar o atendimento ou NÃO para cancelar.");
+    return true;
+  }
+  let ownerId = pending.ownerId;
+  if (!ownerId) {
+    const owner = await createOwner(pending.vet.userId, { organizationId: pending.vet.organizationId, name: pending.data.ownerName, phone: pending.data.ownerPhone, email: pending.data.ownerEmail });
+    if (!owner) throw new Error("Não foi possível criar o proprietário");
+    ownerId = owner.id;
+    if (pending.data.address) await createOwnerAddress(pending.vet.userId, { organizationId: pending.vet.organizationId, ownerId, street: pending.data.address });
+  }
+  let patientId = pending.patientId;
+  if (!patientId) {
+    const patient = await createPatient(pending.vet.userId, { organizationId: pending.vet.organizationId, ownerId, name: pending.data.patientName, species: pending.data.species, breed: pending.data.breed, sex: pending.data.sex, birthDate: pending.data.birthDate ? new Date(pending.data.birthDate) : undefined });
+    if (!patient) throw new Error("Não foi possível criar o animal");
+    patientId = patient.id;
+  }
+  await createMedicalRecord(pending.vet.userId, { organizationId: pending.vet.organizationId, patientId, content: pending.data.summary, title: pending.data.recordTitle || "Atendimento via áudio do Telegram", sourceType: "veterinarian", originalContent: pending.data.summary });
+  pendingConsultations.delete(chatId);
+  await sendMessage(chatId, `Atendimento registrado no prontuário de ${pending.data.patientName}.`);
+  return true;
+}
+
+async function processFreeAudio(chatId: string, vet: NonNullable<Awaited<ReturnType<typeof getVeterinarianByTelegramChat>>>, text: string, audioKey?: string) {
+  const data = await extractFreeConsultation(text);
+  const owners = await findOwnerByName(vet.organizationId, data.ownerName);
+  let ownerId: number | undefined;
+  let patientId: number | undefined;
+  let isNew = owners.length === 0;
+  if (owners.length === 1) {
+    ownerId = owners[0].id;
+    const patients = await listOwnerPatients(vet.organizationId, ownerId);
+    const matches = patients.filter(patient => patient.name.toLowerCase() === data.patientName.toLowerCase());
+    if (matches.length === 1) { patientId = matches[0].id; isNew = false; }
+    else if (matches.length > 1) { await sendMessage(chatId, "Encontrei mais de um animal com esse nome para o proprietário informado. Use /paciente para escolher o paciente."); return; }
+    else isNew = true;
+  }
+  pendingConsultations.set(chatId, { vet: { userId: vet.userId, organizationId: vet.organizationId }, data, ownerId, patientId, audioKey });
+  await sendMessage(chatId, consultationSummary(data, isNew));
+}
 
 async function telegramCall(method: string, body: Record<string, unknown>) {
   if (!ENV.telegramBotToken) throw new Error("TELEGRAM_BOT_TOKEN não configurado");
@@ -74,6 +178,7 @@ async function processText(chatId: string, text: string, vet: NonNullable<Awaite
   const rest = parsed.args;
   const argument = parsed.argument;
   const session = await getTelegramSession(chatId);
+  if (await confirmFreeConsultation(chatId, text)) return;
 
   if (command === "/start" || command === "/ajuda" || command === "/help") {
     await sendMessage(chatId, "Bot veterinário ativo.\n\nComandos:\n/paciente NOME DO PROPRIETÁRIO\n/resumo ID_DO_ANIMAL\n/atendimento ID_DO_ANIMAL TEXTO\n/observacao ID_DO_ANIMAL TEXTO\n/agendar ID_DO_ANIMAL 2026-09-20T14:00\n/pdf ID_DO_ANIMAL\n/sair");
@@ -205,7 +310,8 @@ export function registerTelegramWebhook(app: Express) {
       }
       if (!text) return;
       await saveTelegramMessage({ telegramChatId: chatId, telegramMessageId: message.message_id, organizationId: vet.organizationId, veterinarianUserId: vet.userId, direction: "inbound", messageType: audioKey ? "voice" : "text", text, rawPayload: JSON.stringify(update) });
-      await processText(chatId, text, vet, audioKey);
+      if (audioKey) await processFreeAudio(chatId, vet, text, audioKey);
+      else await processText(chatId, text, vet, audioKey);
     } catch (error) {
       console.error("[Telegram] webhook error", error);
     }
