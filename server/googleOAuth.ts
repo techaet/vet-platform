@@ -3,7 +3,7 @@ import { createCipheriv, randomBytes, scryptSync } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { ENV } from "./_core/env";
 import { sdk } from "./_core/sdk";
-import { getOrganizationForUser, saveGoogleConnection } from "./db";
+import { getOrganizationForUser, getUserById, saveGoogleConnection } from "./db";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -77,6 +77,10 @@ export function registerGoogleOAuthRoutes(app: Express) {
       const userResponse = await fetch(GOOGLE_USERINFO_URL, { headers: { authorization: `Bearer ${tokens.access_token}` } });
       const googleUser = await userResponse.json() as { email?: string };
       if (!userResponse.ok || !googleUser.email) throw new Error("Não foi possível identificar a conta Google autorizada");
+      const currentUser = await getUserById(state.userId);
+      if (currentUser?.email && currentUser.email.toLowerCase() !== googleUser.email.toLowerCase()) {
+        throw new Error(`A conta Google autorizada (${googleUser.email}) é diferente da conta logada (${currentUser.email}). Entre com a mesma conta para continuar.`);
+      }
       await saveGoogleConnection({ userId: state.userId, organizationId: state.organizationId, googleEmail: googleUser.email, accessTokenEncrypted: encrypt(tokens.access_token), refreshTokenEncrypted: tokens.refresh_token ? encrypt(tokens.refresh_token) : null, expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null, scopes: tokens.scope || GOOGLE_SCOPES.join(" ") });
       res.type("html").send("<h1>Google conectado</h1><p>Calendar e Gmail foram autorizados. Você pode fechar esta janela e voltar ao TechVet.</p>");
     } catch (error) {
