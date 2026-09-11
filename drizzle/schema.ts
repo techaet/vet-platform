@@ -194,6 +194,71 @@ export const markdownImports = mysqlTable("markdownImports", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+export const veterinarianAdminDocuments = mysqlTable("veterinarianAdminDocuments", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  veterinarianUserId: int("veterinarianUserId").notNull(),
+  fileName: varchar("fileName", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  storageKey: varchar("storageKey", { length: 500 }),
+  storageUrl: varchar("storageUrl", { length: 700 }),
+  version: int("version").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  veterinarianIndex: index("vet_admin_documents_vet_index").on(table.veterinarianUserId, table.organizationId),
+}));
+
+export const prescriptionTemplates = mysqlTable("prescriptionTemplates", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  veterinarianUserId: int("veterinarianUserId").notNull(),
+  businessName: varchar("businessName", { length: 180 }),
+  professionalName: varchar("professionalName", { length: 180 }),
+  registration: varchar("registration", { length: 80 }),
+  phone: varchar("phone", { length: 40 }),
+  professionalAddress: text("professionalAddress"),
+  headerText: text("headerText"),
+  footerText: text("footerText"),
+  primaryColor: varchar("primaryColor", { length: 20 }).default("#087f70").notNull(),
+  logoKey: varchar("logoKey", { length: 500 }),
+  logoUrl: varchar("logoUrl", { length: 700 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  veterinarianUnique: uniqueIndex("prescription_templates_vet_unique").on(table.organizationId, table.veterinarianUserId),
+}));
+
+export const prescriptions = mysqlTable("prescriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  patientId: int("patientId").notNull(),
+  veterinarianUserId: int("veterinarianUserId").notNull(),
+  medicalRecordId: int("medicalRecordId"),
+  notes: text("notes"),
+  pdfKey: varchar("pdfKey", { length: 500 }),
+  pdfUrl: varchar("pdfUrl", { length: 700 }),
+  issuedAt: timestamp("issuedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  patientIndex: index("prescriptions_patient_index").on(table.patientId, table.createdAt),
+}));
+
+export const prescriptionItems = mysqlTable("prescriptionItems", {
+  id: int("id").autoincrement().primaryKey(),
+  prescriptionId: int("prescriptionId").notNull(),
+  medication: varchar("medication", { length: 180 }).notNull(),
+  concentration: varchar("concentration", { length: 120 }),
+  presentation: varchar("presentation", { length: 120 }),
+  dose: varchar("dose", { length: 160 }),
+  route: varchar("route", { length: 100 }),
+  frequency: varchar("frequency", { length: 120 }),
+  duration: varchar("duration", { length: 120 }),
+  quantity: varchar("quantity", { length: 80 }),
+  instructions: text("instructions"),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Organization = typeof organizations.$inferSelect;
@@ -202,3 +267,6 @@ export type Owner = typeof owners.$inferSelect;
 export type Patient = typeof patients.$inferSelect;
 export type MedicalRecord = typeof medicalRecords.$inferSelect;
 export type PatientAttachment = typeof patientAttachments.$inferSelect;
+export type VeterinarianAdminDocument = typeof veterinarianAdminDocuments.$inferSelect;
+export type PrescriptionTemplate = typeof prescriptionTemplates.$inferSelect;
+export type Prescription = typeof prescriptions.$inferSelect;

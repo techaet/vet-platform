@@ -5,6 +5,10 @@ import {
   InsertUser,
   medicalRecords,
   markdownImports,
+  prescriptionItems,
+  prescriptions,
+  prescriptionTemplates,
+  veterinarianAdminDocuments,
   organizationMembers,
   organizations,
   ownerAddresses,
@@ -83,7 +87,7 @@ export async function getOrganizationForUser(userId: number, organizationId: num
   return result[0];
 }
 
-async function requireOrganizationMember(userId: number, organizationId: number) {
+export async function requireOrganizationMember(userId: number, organizationId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   const result = await db.select().from(organizationMembers).where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.status, "active"))).limit(1);
@@ -175,4 +179,75 @@ export async function createAttachment(userId: number, input: { organizationId: 
   const result = await db.insert(patientAttachments).values({ ...input, uploadedByUserId: userId, medicalRecordId: input.medicalRecordId || null, description: input.description || null });
   const created = await db.select().from(patientAttachments).where(eq(patientAttachments.id, Number(result[0].insertId))).limit(1);
   return created[0];
+}
+
+export async function listAdminDocuments(userId: number, organizationId: number) {
+  await requireOrganizationMember(userId, organizationId);
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(veterinarianAdminDocuments)
+    .where(and(eq(veterinarianAdminDocuments.organizationId, organizationId), eq(veterinarianAdminDocuments.veterinarianUserId, userId)))
+    .orderBy(desc(veterinarianAdminDocuments.updatedAt));
+}
+
+export async function saveAdminDocument(userId: number, input: { organizationId: number; fileName: string; content: string; storageKey?: string; storageUrl?: string }) {
+  await requireOrganizationMember(userId, input.organizationId);
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const previous = await db.select().from(veterinarianAdminDocuments)
+    .where(and(eq(veterinarianAdminDocuments.organizationId, input.organizationId), eq(veterinarianAdminDocuments.veterinarianUserId, userId)))
+    .orderBy(desc(veterinarianAdminDocuments.version)).limit(1);
+  if (previous[0]) {
+    await db.update(veterinarianAdminDocuments).set({ fileName: input.fileName, content: input.content, storageKey: input.storageKey || null, storageUrl: input.storageUrl || null, version: previous[0].version + 1, updatedAt: new Date() }).where(eq(veterinarianAdminDocuments.id, previous[0].id));
+    const updated = await db.select().from(veterinarianAdminDocuments).where(eq(veterinarianAdminDocuments.id, previous[0].id)).limit(1);
+    return updated[0];
+  }
+  const result = await db.insert(veterinarianAdminDocuments).values({ organizationId: input.organizationId, veterinarianUserId: userId, fileName: input.fileName, content: input.content, storageKey: input.storageKey || null, storageUrl: input.storageUrl || null });
+  const created = await db.select().from(veterinarianAdminDocuments).where(eq(veterinarianAdminDocuments.id, Number(result[0].insertId))).limit(1);
+  return created[0];
+}
+
+export async function getPrescriptionTemplate(userId: number, organizationId: number) {
+  await requireOrganizationMember(userId, organizationId);
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(prescriptionTemplates).where(and(eq(prescriptionTemplates.organizationId, organizationId), eq(prescriptionTemplates.veterinarianUserId, userId))).limit(1);
+  return rows[0];
+}
+
+export async function savePrescriptionTemplate(userId: number, input: { organizationId: number; businessName?: string; professionalName?: string; registration?: string; phone?: string; professionalAddress?: string; headerText?: string; footerText?: string; primaryColor?: string }) {
+  await requireOrganizationMember(userId, input.organizationId);
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const existing = await getPrescriptionTemplate(userId, input.organizationId);
+  if (existing) {
+    await db.update(prescriptionTemplates).set({ ...input, veterinarianUserId: undefined, updatedAt: new Date() }).where(eq(prescriptionTemplates.id, existing.id));
+    const updated = await db.select().from(prescriptionTemplates).where(eq(prescriptionTemplates.id, existing.id)).limit(1);
+    return updated[0];
+  }
+  const result = await db.insert(prescriptionTemplates).values({ ...input, veterinarianUserId: userId });
+  const created = await db.select().from(prescriptionTemplates).where(eq(prescriptionTemplates.id, Number(result[0].insertId))).limit(1);
+  return created[0];
+}
+
+export async function createPrescription(userId: number, input: { organizationId: number; patientId: number; medicalRecordId?: number; notes?: string; items: Array<{ medication: string; concentration?: string; presentation?: string; dose?: string; route?: string; frequency?: string; duration?: string; quantity?: string; instructions?: string }> }) {
+  await requireOrganizationMember(userId, input.organizationId);
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const result = await db.insert(prescriptions).values({ organizationId: input.organizationId, patientId: input.patientId, veterinarianUserId: userId, medicalRecordId: input.medicalRecordId || null, notes: input.notes || null });
+  const prescriptionId = Number(result[0].insertId);
+  if (input.items.length) await db.insert(prescriptionItems).values(input.items.map(item => ({ ...item, prescriptionId })));
+  const created = await db.select().from(prescriptions).where(eq(prescriptions.id, prescriptionId)).limit(1);
+  const items = await db.select().from(prescriptionItems).where(eq(prescriptionItems.prescriptionId, prescriptionId));
+  return { prescription: created[0], items };
+}
+
+
+export async function setPrescriptionPdf(userId: number, input: { organizationId: number; prescriptionId: number; pdfKey: string; pdfUrl: string }) {
+  await requireOrganizationMember(userId, input.organizationId);
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(prescriptions).set({ pdfKey: input.pdfKey, pdfUrl: input.pdfUrl, updatedAt: new Date() }).where(and(eq(prescriptions.id, input.prescriptionId), eq(prescriptions.organizationId, input.organizationId), eq(prescriptions.veterinarianUserId, userId)));
+  const updated = await db.select().from(prescriptions).where(eq(prescriptions.id, input.prescriptionId)).limit(1);
+  return updated[0];
 }
