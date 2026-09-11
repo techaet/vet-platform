@@ -255,9 +255,9 @@ export async function saveAdminDocument(userId: number, input: { organizationId:
 export async function getPrescriptionTemplate(userId: number, organizationId: number) {
   await requireOrganizationMember(userId, organizationId);
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const rows = await db.select().from(prescriptionTemplates).where(and(eq(prescriptionTemplates.organizationId, organizationId), eq(prescriptionTemplates.veterinarianUserId, userId))).limit(1);
-  return rows[0];
+  return rows[0] ?? null;
 }
 
 export async function savePrescriptionTemplate(userId: number, input: { organizationId: number; businessName?: string; professionalName?: string; registration?: string; phone?: string; professionalAddress?: string; headerText?: string; footerText?: string; primaryColor?: string; letterheadKey?: string; letterheadUrl?: string }) {
@@ -400,12 +400,12 @@ export async function markReminderSent(reminderId: number) {
 
 export async function getGoogleConnection(userId: number, organizationId: number) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) return null;
   const rows = await db.select({ id: googleConnections.id, googleEmail: googleConnections.googleEmail, scopes: googleConnections.scopes, updatedAt: googleConnections.updatedAt })
     .from(googleConnections)
     .where(and(eq(googleConnections.userId, userId), eq(googleConnections.organizationId, organizationId)))
     .limit(1);
-  return rows[0];
+  return rows[0] ?? null;
 }
 
 export async function saveGoogleConnection(input: { userId: number; organizationId: number; googleEmail: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string | null; expiresAt?: Date | null; scopes?: string | null }) {
