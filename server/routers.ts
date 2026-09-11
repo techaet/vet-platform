@@ -91,13 +91,21 @@ export const appRouter = router({
   }),
   prescription: router({
     template: protectedProcedure.input(orgId).query(({ ctx, input }) => getPrescriptionTemplate(ctx.user.id, input.organizationId)),
-    saveTemplate: protectedProcedure.input(orgId.extend({ businessName: z.string().max(180).optional(), professionalName: z.string().max(180).optional(), registration: z.string().max(80).optional(), phone: z.string().max(40).optional(), professionalAddress: z.string().max(1000).optional(), headerText: z.string().max(2000).optional(), footerText: z.string().max(2000).optional(), primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() })).mutation(({ ctx, input }) => savePrescriptionTemplate(ctx.user.id, input)),
-    create: protectedProcedure.input(orgId.extend({ patientId: z.number().int().positive(), medicalRecordId: z.number().int().positive().optional(), notes: z.string().max(3000).optional(), items: z.array(z.object({ medication: z.string().min(1).max(180), concentration: z.string().max(120).optional(), presentation: z.string().max(120).optional(), dose: z.string().max(160).optional(), route: z.string().max(100).optional(), frequency: z.string().max(120).optional(), duration: z.string().max(120).optional(), quantity: z.string().max(80).optional(), instructions: z.string().max(2000).optional() })).min(1) })).mutation(async ({ ctx, input }) => {
+    saveTemplate: protectedProcedure.input(orgId.extend({ businessName: z.string().max(180).optional(), professionalName: z.string().max(180).optional(), registration: z.string().max(80).optional(), phone: z.string().max(40).optional(), professionalAddress: z.string().max(1000).optional(), headerText: z.string().max(2000).optional(), footerText: z.string().max(2000).optional(), primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), letterheadKey: z.string().max(500).optional(), letterheadUrl: z.string().max(700).optional() })).mutation(({ ctx, input }) => savePrescriptionTemplate(ctx.user.id, input)),
+    uploadLetterhead: protectedProcedure.input(orgId.extend({ fileName: z.string().max(255), fileData: z.string().max(14_000_000) })).mutation(async ({ ctx, input }) => {
+      if (!input.fileName.toLowerCase().endsWith(".pdf")) throw new Error("A folha timbrada deve ser um PDF");
+      const match = input.fileData.match(/^data:application\/pdf;base64,(.+)$/);
+      if (!match) throw new Error("PDF inválido");
+      const buffer = Buffer.from(match[1], "base64");
+      const stored = await storagePut(`organizations/${input.organizationId}/veterinarians/${ctx.user.id}/letterhead.pdf`, buffer, "application/pdf");
+      return savePrescriptionTemplate(ctx.user.id, { organizationId: input.organizationId, letterheadKey: stored.key, letterheadUrl: stored.url });
+    }),
+    create: protectedProcedure.input(orgId.extend({ patientId: z.number().int().positive(), medicalRecordId: z.number().int().positive().optional(), issuedAt: z.coerce.date().optional(), content: z.string().max(12000).optional(), notes: z.string().max(3000).optional(), items: z.array(z.object({ medication: z.string().min(1).max(180), concentration: z.string().max(120).optional(), presentation: z.string().max(120).optional(), dose: z.string().max(160).optional(), route: z.string().max(100).optional(), frequency: z.string().max(120).optional(), duration: z.string().max(120).optional(), quantity: z.string().max(80).optional(), instructions: z.string().max(2000).optional() })).default([]) })).mutation(async ({ ctx, input }) => {
       const result = await createPrescription(ctx.user.id, input);
       const patient = await getPatient(ctx.user.id, input.organizationId, input.patientId);
       if (!patient) throw new Error("Paciente não encontrado");
       const template = await getPrescriptionTemplate(ctx.user.id, input.organizationId);
-      const pdf = buildPrescriptionPdf({ ...template, patientName: patient.name, ownerName: patient.ownerName, issuedAt: result.prescription.issuedAt, notes: input.notes, items: result.items });
+      const pdf = await buildPrescriptionPdf({ letterheadUrl: template?.letterheadUrl, patientName: patient.name, ownerName: patient.ownerName, issuedAt: result.prescription.issuedAt, content: input.content, notes: input.notes, items: result.items });
       const stored = await storagePut(`organizations/${input.organizationId}/patients/${input.patientId}/prescriptions/receita-${result.prescription.id}.pdf`, pdf, "application/pdf");
       const updated = await setPrescriptionPdf(ctx.user.id, { organizationId: input.organizationId, prescriptionId: result.prescription.id, pdfKey: stored.key, pdfUrl: stored.url });
       return { ...result, prescription: updated };

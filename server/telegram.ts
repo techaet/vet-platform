@@ -127,7 +127,7 @@ async function processText(chatId: string, text: string, vet: NonNullable<Awaite
     const patientId = Number(rest[0] || session?.patientId);
     const patient = patientId ? await getPatient(vet.userId, vet.organizationId, patientId) : undefined;
     if (!patient) { await sendMessage(chatId, "Informe um ID de animal válido. Ex.: /pdf 12"); return; }
-    const pdf = buildPrescriptionPdf({ businessName: "Prontuário veterinário", professionalName: vet.displayName, patientName: patient.name, ownerName: patient.ownerName, issuedAt: new Date(), notes: patient.records.map(record => `${record.title || "Registro"}: ${record.content}`).join("\n"), items: [] });
+    const pdf = await buildPrescriptionPdf({ patientName: patient.name, ownerName: patient.ownerName, issuedAt: new Date(), content: patient.records.map(record => `${record.title || "Registro"}: ${record.content}`).join("\n"), items: [] });
     const stored = await storagePut(`telegram/${vet.organizationId}/patients/${patient.id}/prontuario-${patient.id}.pdf`, pdf, "application/pdf");
     const signedUrl = await storageGetSignedUrl(stored.key);
     await telegramCall("sendDocument", { chat_id: chatId, document: signedUrl, caption: `Prontuário de ${patient.name}` });

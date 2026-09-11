@@ -260,7 +260,7 @@ export async function getPrescriptionTemplate(userId: number, organizationId: nu
   return rows[0];
 }
 
-export async function savePrescriptionTemplate(userId: number, input: { organizationId: number; businessName?: string; professionalName?: string; registration?: string; phone?: string; professionalAddress?: string; headerText?: string; footerText?: string; primaryColor?: string }) {
+export async function savePrescriptionTemplate(userId: number, input: { organizationId: number; businessName?: string; professionalName?: string; registration?: string; phone?: string; professionalAddress?: string; headerText?: string; footerText?: string; primaryColor?: string; letterheadKey?: string; letterheadUrl?: string }) {
   await requireOrganizationMember(userId, input.organizationId);
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
@@ -275,11 +275,11 @@ export async function savePrescriptionTemplate(userId: number, input: { organiza
   return created[0];
 }
 
-export async function createPrescription(userId: number, input: { organizationId: number; patientId: number; medicalRecordId?: number; notes?: string; items: Array<{ medication: string; concentration?: string; presentation?: string; dose?: string; route?: string; frequency?: string; duration?: string; quantity?: string; instructions?: string }> }) {
+export async function createPrescription(userId: number, input: { organizationId: number; patientId: number; medicalRecordId?: number; issuedAt?: Date; content?: string; notes?: string; items: Array<{ medication: string; concentration?: string; presentation?: string; dose?: string; route?: string; frequency?: string; duration?: string; quantity?: string; instructions?: string }> }) {
   await requireOrganizationMember(userId, input.organizationId);
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const result = await db.insert(prescriptions).values({ organizationId: input.organizationId, patientId: input.patientId, veterinarianUserId: userId, medicalRecordId: input.medicalRecordId || null, notes: input.notes || null });
+  const result = await db.insert(prescriptions).values({ organizationId: input.organizationId, patientId: input.patientId, veterinarianUserId: userId, medicalRecordId: input.medicalRecordId || null, issuedAt: input.issuedAt || new Date(), content: input.content || null, notes: input.notes || null });
   const prescriptionId = Number(result[0].insertId);
   if (input.items.length) await db.insert(prescriptionItems).values(input.items.map(item => ({ ...item, prescriptionId })));
   const created = await db.select().from(prescriptions).where(eq(prescriptions.id, prescriptionId)).limit(1);

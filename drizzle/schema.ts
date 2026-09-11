@@ -241,6 +241,8 @@ export const prescriptionTemplates = mysqlTable("prescriptionTemplates", {
   primaryColor: varchar("primaryColor", { length: 20 }).default("#087f70").notNull(),
   logoKey: varchar("logoKey", { length: 500 }),
   logoUrl: varchar("logoUrl", { length: 700 }),
+  letterheadKey: varchar("letterheadKey", { length: 500 }),
+  letterheadUrl: varchar("letterheadUrl", { length: 700 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, table => ({
@@ -253,6 +255,7 @@ export const prescriptions = mysqlTable("prescriptions", {
   patientId: int("patientId").notNull(),
   veterinarianUserId: int("veterinarianUserId").notNull(),
   medicalRecordId: int("medicalRecordId"),
+  content: text("content"),
   notes: text("notes"),
   pdfKey: varchar("pdfKey", { length: 500 }),
   pdfUrl: varchar("pdfUrl", { length: 700 }),

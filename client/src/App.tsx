@@ -10,6 +10,7 @@ import PatientDetail from "./pages/PatientDetail";
 import Admin from "./pages/Admin";
 import Telegram from "./pages/Telegram";
 import Agenda from "./pages/Agenda";
+import Legal from "./pages/Legal";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -21,6 +22,7 @@ function Router() {
       <Route path={"/admin"} component={Admin} />
       <Route path={"/telegram"} component={Telegram} />
       <Route path={"/agenda"} component={Agenda} />
+      <Route path={"/legal"} component={Legal} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -38,7 +40,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider
         defaultTheme="light"
-        // switchable
+        switchable
       >
         <TooltipProvider>
           <Toaster />

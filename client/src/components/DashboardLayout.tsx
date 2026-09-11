@@ -21,11 +21,12 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { Bot, CalendarDays, LayoutDashboard, LogOut, PanelLeft, Settings, Users } from "lucide-react";
+import { Bot, CalendarDays, FileText, LayoutDashboard, LogOut, Moon, PanelLeft, Settings, Sun, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Visão geral", path: "/" },
@@ -108,6 +109,7 @@ function DashboardLayoutContent({
   setSidebarWidth,
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
@@ -222,6 +224,13 @@ function DashboardLayoutContent({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={toggleTheme} className="cursor-pointer">
+                  {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                  <span>{theme === "dark" ? "Modo claro" : "Modo escuro"}</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation("/legal")} className="cursor-pointer">
+                  <FileText className="mr-2 h-4 w-4" /><span>Termos e privacidade</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive"
