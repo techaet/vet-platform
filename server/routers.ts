@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -76,7 +77,7 @@ export const appRouter = router({
   markdown: router({
     import: protectedProcedure.input(orgId.extend({ fileName: z.string().max(255), content: z.string().min(1).max(5_000_000) })).mutation(async ({ ctx, input }) => {
       const access = await getOrganizationForUser(ctx.user.id, input.organizationId);
-      if (!access) throw new Error("Organization access denied");
+      if (!access) throw new TRPCError({ code: "FORBIDDEN", message: "Acesso à organização negado" });
       const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
       const stored = await storagePut(`organizations/${input.organizationId}/imports/${safeName}`, input.content, "text/markdown");
       return importMarkdownForOrganization({ userId: ctx.user.id, organizationId: input.organizationId, fileName: input.fileName, content: input.content, sourceKey: stored.key, sourceUrl: stored.url });

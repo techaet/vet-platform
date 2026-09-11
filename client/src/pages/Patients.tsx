@@ -17,7 +17,7 @@ export default function Patients() {
   const createOwner = trpc.owner.create.useMutation();
   const addAddress = trpc.owner.addAddress.useMutation();
   const createPatient = trpc.patient.create.useMutation({ onSuccess: () => { patients.refetch(); setCreated("Paciente cadastrado."); } });
-  const importMarkdown = trpc.markdown.import.useMutation({ onSuccess: result => setImportResult(`Importados: ${result.ownersCreated} proprietários, ${result.patientsCreated} animais e ${result.recordsCreated} atendimentos.`) });
+  const importMarkdown = trpc.markdown.import.useMutation({ onSuccess: result => { patients.refetch(); setImportResult(`Importados: ${result.ownersCreated} proprietários, ${result.patientsCreated} animais e ${result.recordsCreated} atendimentos.${result.warnings.length ? ` Avisos: ${result.warnings.join("; ")}` : ""}`); }, onError: error => setImportResult(`Não foi possível importar o arquivo: ${error.message}`) });
   const fileRef = useRef<HTMLInputElement>(null);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -38,6 +38,7 @@ export default function Patients() {
     const file = event.target.files?.[0];
     if (!file || !organizationId) return;
     const content = await file.text();
+    setImportResult(`Importando ${file.name}...`);
     importMarkdown.mutate({ organizationId, fileName: file.name, content });
     event.target.value = "";
   };

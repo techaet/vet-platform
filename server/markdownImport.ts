@@ -21,131 +21,143 @@ export type MarkdownOwner = {
   animals: MarkdownAnimal[];
 };
 
-const labels = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+const normalizeLabel = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-function valueAfterLabel(line: string, names: string[]) {
-  const normalized = labels(line);
-  const name = names.find(item => normalized.startsWith(`${labels(item)}:`));
-  return name ? line.slice(line.indexOf(":") + 1).trim() : undefined;
+function field(line: string, ...labels: string[]) {
+  const separator = line.indexOf(":");
+  if (separator < 0) return undefined;
+  const current = normalizeLabel(line.slice(0, separator));
+  return labels.some(label => normalizeLabel(label) === current) ? line.slice(separator + 1).trim() || undefined : undefined;
 }
 
 function parseDate(value?: string) {
   if (!value) return undefined;
-  const match = value.match(/\b(\d{4})[-/](\d{2})[-/](\d{2})\b|\b(\d{2})[/-](\d{2})[/-](\d{4})\b/);
-  if (!match) return undefined;
-  const year = match[1] || match[6];
-  const month = match[2] || match[5];
-  const day = match[3] || match[4];
-  return new Date(`${year}-${month}-${day}T12:00:00Z`);
+  const match = value.match(/(\d{4})[-/](\d{2})[-/](\d{2})/);
+  return match ? new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00Z`) : undefined;
 }
 
 function parseSex(value?: string): MarkdownAnimal["sex"] {
-  if (!value) return undefined;
-  const normalized = labels(value);
+  const normalized = normalizeLabel(value || "");
   if (["macho", "male", "masculino"].includes(normalized)) return "male";
   if (["femea", "female", "feminino"].includes(normalized)) return "female";
-  return "unknown";
+  if (normalized) return "unknown";
+  return undefined;
 }
 
-function headingValue(line: string, patterns: RegExp[]) {
-  const pattern = patterns.find(item => item.test(line));
-  return pattern ? line.slice(line.indexOf(":") + 1).trim() : undefined;
+function headingValue(line: string, pattern: RegExp) {
+  const match = line.match(pattern);
+  return match?.[1]?.trim() || undefined;
 }
 
 export function parseMarkdown(content: string): MarkdownOwner[] {
-  const lines = content.split(/\r?\n/);
   const owners: MarkdownOwner[] = [];
   let owner: MarkdownOwner | undefined;
   let animal: MarkdownAnimal | undefined;
   let record: MarkdownRecord | undefined;
-  let block: string[] = [];
+  let recordLines: string[] = [];
+  let addressMode = false;
 
-  const ensureOwner = (name = "Proprietário não identificado") => {
-    if (!owner) {
-      owner = { name, animals: [] };
-      owners.push(owner);
-    }
-    return owner;
-  };
-  const ensureAnimal = (name = "Animal não identificado") => {
-    const currentOwner = ensureOwner();
-    if (!animal) {
-      animal = { name, records: [] };
-      currentOwner.animals.push(animal);
-    }
-    return animal;
-  };
   const flushRecord = () => {
     if (record && animal) {
-      record.content = block.join("\n").trim();
+      record.content = recordLines.join("\n").trim();
       if (record.content) animal.records.push(record);
     }
     record = undefined;
-    block = [];
+    recordLines = [];
   };
-  const flushAnimal = () => { flushRecord(); animal = undefined; };
-  const flushOwner = () => { flushAnimal(); owner = undefined; };
-  const startRecord = (value: string, fallbackTitle = "Atendimento importado") => {
-    const currentAnimal = ensureAnimal();
+  const flushAnimal = () => {
     flushRecord();
-    const date = parseDate(value);
-    const title = value.replace(/\b\d{4}[-/]\d{2}[-/]\d{2}\b|\b\d{2}[/-]\d{2}[/-]\d{4}\b/, "").replace(/^[\s—-]+|[\s—-]+$/g, "").trim();
-    record = { date, title: title || fallbackTitle, content: "" };
-    return currentAnimal;
+    if (owner && animal) owner.animals.push(animal);
+    animal = undefined;
+    addressMode = false;
+  };
+  const flushOwner = () => {
+    flushAnimal();
+    if (owner) owners.push(owner);
+    owner = undefined;
   };
 
-  for (const rawLine of lines) {
+  for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (!line) { if (record) block.push(rawLine); continue; }
-
-    const ownerName = headingValue(line, [/^#\s+Propriet[aá]rio\s*:/i, /^#\s+Proprietario\s*:/i, /^#\s+(?:Tutor|Dono)\s*:/i])
-      || valueAfterLabel(line, ["Proprietário", "Proprietario", "Tutor", "Dono"]);
-    if (ownerName) { flushOwner(); owner = { name: ownerName, animals: [] }; owners.push(owner); continue; }
-
-    const animalName = headingValue(line, [/^##?\s+Animal\s*:/i, /^##?\s+Paciente\s*:/i, /^##?\s+Pet\s*:/i])
-      || valueAfterLabel(line, ["Animal", "Paciente", "Pet"]);
-    if (animalName) { flushAnimal(); ensureOwner(); animal = { name: animalName, records: [] }; owner!.animals.push(animal); continue; }
-
-    const address = headingValue(line, [/^##\s+Endere[cç]o\s*:/i]);
-    if (address) { ensureOwner().address = { label: address || "Residência" }; continue; }
-
-    const recordHeading = headingValue(line, [/^###?\s+(?:Atendimento|Consulta|Retorno)\s*:/i]);
-    const looseDate = line.match(/\b(?:consulta|atendimento|retorno)\b[^\d]*(\d{2}[/-]\d{2}[/-]\d{4}|\d{4}[-/]\d{2}[-/]\d{2})/i);
-    if (recordHeading || looseDate) {
-      startRecord(recordHeading || looseDate?.[1] || line, looseDate ? "Consulta importada" : undefined);
-      if (looseDate?.index !== undefined) {
-        const sameLineContent = line.slice(looseDate.index + looseDate[0].length).replace(/^\s*[:—-]\s*/, "").trim();
-        if (sameLineContent) block.push(sameLineContent);
+    if (/^#\s+Propriet[aá]rio\s*:/i.test(line)) {
+      flushOwner();
+      owner = { name: line.slice(line.indexOf(":") + 1).trim(), animals: [] };
+      continue;
+    }
+    const address = headingValue(line, /^##\s+Endere[cç]o\s*:\s*(.*)$/i);
+    if (address !== undefined) {
+      if (owner) {
+        addressMode = true;
+        owner.address = { label: address || "Residência" };
       }
       continue;
     }
-
-    if (!owner && /\b(?:tutor|propriet[aá]rio|dono)\b/i.test(line)) { ensureOwner(); }
-    if (!animal && /\b(?:animal|paciente|pet)\b/i.test(line)) {
-      const mentioned = line.match(/(?:animal|paciente|pet)\s*[:=-]?\s*([A-ZÀ-Ú][\wÀ-ú-]+)/i)?.[1];
-      ensureAnimal(mentioned);
+    const animalName = headingValue(line, /^##\s+Animal\s*:\s*(.*)$/i);
+    if (animalName !== undefined) {
+      if (owner) {
+        flushAnimal();
+        animal = { name: animalName, records: [] };
+      }
+      continue;
     }
+    const attendance = headingValue(line, /^###\s+Atendimento\s*:\s*(.*)$/i);
+    if (attendance !== undefined) {
+      if (animal) {
+        flushRecord();
+        const [datePart, ...titleParts] = attendance.split(/\s+[—-]\s+/);
+        record = { date: parseDate(datePart), title: titleParts.join(" — ") || "Atendimento importado", content: "" };
+      }
+      continue;
+    }
+    if (record) {
+      recordLines.push(rawLine);
+      continue;
+    }
+    if (!owner || !line) continue;
 
-    const currentOwner = owner;
-    if (record) { block.push(rawLine); continue; }
-    if (currentOwner && !animal) {
-      currentOwner.phone ||= valueAfterLabel(line, ["Telefone", "Celular", "WhatsApp"]);
-      currentOwner.email ||= valueAfterLabel(line, ["E-mail", "Email"]);
-      if (currentOwner.address) {
-        for (const label of ["CEP", "Estado", "Cidade", "Bairro", "Logradouro", "Número", "Numero", "Complemento", "Referência", "Referencia", "Instruções de acesso", "Instrucoes de acesso"]) {
-          const value = valueAfterLabel(line, [label]);
-          if (value) currentOwner.address[labels(label)] = value;
+    const ownerPhone = field(line, "Telefone", "Celular", "WhatsApp");
+    const ownerEmail = field(line, "E-mail", "Email");
+    if (!animal) {
+      if (ownerPhone) owner.phone = ownerPhone;
+      if (ownerEmail) owner.email = ownerEmail;
+      if (addressMode) {
+        const mappings: Array<[string, string[]]> = [
+          ["cep", ["CEP"]], ["estado", ["Estado", "UF"]], ["cidade", ["Cidade"]],
+          ["bairro", ["Bairro"]], ["logradouro", ["Logradouro", "Rua"]], ["numero", ["Número", "Numero"]],
+          ["complemento", ["Complemento"]], ["referencia", ["Referência", "Referencia"]],
+          ["instrucoes de acesso", ["Instruções de acesso", "Instrucoes de acesso"]],
+        ];
+        for (const [key, labels] of mappings) {
+          const value = field(line, ...labels);
+          if (value) owner.address = { ...(owner.address || {}), [key]: value };
         }
       }
-    } else if (animal) {
-      animal.species ||= valueAfterLabel(line, ["Espécie", "Especie"]) || line.match(/\b(canino|felino|c[aã]o|gato)\b/i)?.[1];
-      animal.breed ||= valueAfterLabel(line, ["Raça", "Raca"]);
-      animal.sex ||= parseSex(valueAfterLabel(line, ["Sexo"]));
-      animal.birthDate ||= parseDate(valueAfterLabel(line, ["Nascimento", "Data de nascimento"]));
-      const date = parseDate(line);
-      if (date && !record) startRecord(line, "Consulta importada");
+    } else {
+      animal.species ||= field(line, "Espécie", "Especie");
+      animal.breed ||= field(line, "Raça", "Raca");
+      animal.sex ||= parseSex(field(line, "Sexo"));
+      animal.birthDate ||= parseDate(field(line, "Nascimento", "Data de nascimento"));
     }
   }
+
   flushOwner();
-  return owners;
+  return owners.filter(item => item.name && item.animals.length > 0);
 }
+
+export const markdownImportExample = `# Proprietário: Maria da Silva
+Telefone: 51999999999
+E-mail: maria@example.com
+
+## Endereço: Residência
+Cidade: Marau
+Logradouro: Rua Central
+Número: 10
+
+## Animal: Thor
+Espécie: Canino
+Raça: Golden Retriever
+Sexo: Macho
+
+### Atendimento: 2024-03-15 — Retorno clínico
+Queixa principal: retorno clínico.
+Conduta: acompanhamento.`;
