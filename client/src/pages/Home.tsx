@@ -13,7 +13,7 @@ import { useState } from "react";
 const foundationItems = [
   { icon: FileText, label: "Prontuário", detail: "Base preparada para pacientes e histórico clínico" },
   { icon: CalendarDays, label: "Agenda", detail: "Estrutura pronta para consultas e lembretes" },
-  { icon: MessageCircle, label: "Telegram", detail: "Integração será adicionada na próxima fase" },
+  { icon: MessageCircle, label: "Telegram", detail: "Integração com o bot e comandos operacionais" },
   { icon: Users, label: "Equipe", detail: "Organizações e membros já provisionados" },
 ];
 
