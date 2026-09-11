@@ -23,6 +23,9 @@ export default function Home() {
   const createOrganization = trpc.organization.create.useMutation({
     onSuccess: () => organizationsQuery.refetch(),
   });
+  const deleteOrganization = trpc.organization.delete.useMutation({
+    onSuccess: () => organizationsQuery.refetch(),
+  });
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -30,6 +33,12 @@ export default function Home() {
   const submitOrganization = (event: React.FormEvent) => {
     event.preventDefault();
     createOrganization.mutate({ name, slug, description: description || undefined });
+  };
+
+  const removeOrganization = (organization: { id: number; name: string }) => {
+    if (user?.role !== "admin") return;
+    const confirmation = window.prompt(`Digite EXCLUIR ORGANIZAÇÃO para apagar ${organization.name} e todos os seus dados.`);
+    if (confirmation === "EXCLUIR ORGANIZAÇÃO") deleteOrganization.mutate({ organizationId: organization.id, confirmation });
   };
 
   return (
@@ -87,6 +96,7 @@ export default function Home() {
                         <Badge variant="outline">{organization.role === "admin" ? "Administrador" : "Veterinário"}</Badge>
                       </div>
                       {organization.description ? <p className="mt-3 text-sm text-muted-foreground">{organization.description}</p> : null}
+                      {user.role === "admin" ? <Button type="button" variant="destructive" size="sm" className="mt-4" disabled={deleteOrganization.isPending} onClick={() => removeOrganization(organization)}>Excluir organização</Button> : null}
                     </div>
                   ))}
                 </CardContent>

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertOrganization,
@@ -99,6 +99,37 @@ export async function getOrganizationForUser(userId: number, organizationId: num
     .from(organizationMembers).innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.status, "active"))).limit(1);
   return result[0];
+}
+
+export async function deleteOrganizationAsAdmin(organizationId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  return db.transaction(async tx => {
+    const organization = await tx.select({ id: organizations.id, name: organizations.name }).from(organizations).where(eq(organizations.id, organizationId)).limit(1);
+    if (!organization[0]) throw new Error("Organization not found");
+    await tx.execute(sql`DELETE FROM appointmentReminders WHERE appointmentId IN (SELECT id FROM appointments WHERE organizationId = ${organizationId})`);
+    await tx.execute(sql`DELETE FROM prescriptionItems WHERE prescriptionId IN (SELECT id FROM prescriptions WHERE organizationId = ${organizationId})`);
+    await tx.execute(sql`DELETE FROM ownerAddresses WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM patientAttachments WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM medicalRecords WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM ownerObservations WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM prescriptions WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM appointments WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM patients WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM owners WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM markdownImports WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM veterinarianAdminDocuments WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM prescriptionTemplates WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM veterinarianProfiles WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM googleConnections WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM telegramMessages WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM telegramSessions WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM subscriptionEvents WHERE subscriptionId IN (SELECT id FROM subscriptions WHERE organizationId = ${organizationId})`);
+    await tx.execute(sql`DELETE FROM subscriptions WHERE organizationId = ${organizationId}`);
+    await tx.execute(sql`DELETE FROM organizationMembers WHERE organizationId = ${organizationId}`);
+    await tx.delete(organizations).where(eq(organizations.id, organizationId));
+    return organization[0];
+  });
 }
 
 export async function requireOrganizationMember(userId: number, organizationId: number) {

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import { adminProcedure, protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
 import {
   createMedicalRecord,
@@ -27,6 +27,7 @@ import {
   listAppointments,
   getGoogleConnection,
   createTelegramLinkCode,
+  deleteOrganizationAsAdmin,
 } from "./db";
 import { importMarkdownForOrganization } from "./markdownImportDb";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
@@ -46,6 +47,7 @@ export const appRouter = router({
     mine: protectedProcedure.query(({ ctx }) => getOrganizationsForUser(ctx.user.id)),
     get: protectedProcedure.input(orgId).query(({ ctx, input }) => getOrganizationForUser(ctx.user.id, input.organizationId)),
     create: protectedProcedure.input(organizationInput).mutation(({ ctx, input }) => createOrganizationForUser({ userId: ctx.user.id, ...input })),
+    delete: adminProcedure.input(orgId.extend({ confirmation: z.literal("EXCLUIR ORGANIZAÇÃO") })).mutation(({ input }) => deleteOrganizationAsAdmin(input.organizationId)),
   }),
   owner: router({
     list: protectedProcedure.input(orgId).query(({ ctx, input }) => listOwners(ctx.user.id, input.organizationId)),
