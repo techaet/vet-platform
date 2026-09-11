@@ -54,6 +54,8 @@ export const veterinarianProfiles = mysqlTable("veterinarianProfiles", {
   phone: varchar("phone", { length: 40 }),
   professionalRegistration: varchar("professionalRegistration", { length: 80 }),
   telegramChatId: varchar("telegramChatId", { length: 80 }),
+  telegramLinkCodeHash: varchar("telegramLinkCodeHash", { length: 64 }),
+  telegramLinkCodeExpiresAt: timestamp("telegramLinkCodeExpiresAt"),
   bio: text("bio"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),

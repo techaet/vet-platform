@@ -26,6 +26,7 @@ import {
   setVeterinarianTelegramChat,
   listAppointments,
   getGoogleConnection,
+  createTelegramLinkCode,
 } from "./db";
 import { importMarkdownForOrganization } from "./markdownImportDb";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
@@ -102,6 +103,7 @@ export const appRouter = router({
   }),
   telegram: router({
     connect: protectedProcedure.input(orgId.extend({ chatId: z.string().min(1).max(80) })).mutation(({ ctx, input }) => setVeterinarianTelegramChat(ctx.user.id, input.organizationId, input.chatId)),
+    linkCode: protectedProcedure.input(orgId).mutation(({ ctx, input }) => createTelegramLinkCode(ctx.user.id, input.organizationId)),
   }),
   appointment: router({
     list: protectedProcedure.input(orgId.extend({ from: z.coerce.date().optional(), to: z.coerce.date().optional() })).query(({ ctx, input }) => listAppointments(ctx.user.id, input.organizationId, input.from, input.to)),

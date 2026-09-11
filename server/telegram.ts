@@ -15,6 +15,7 @@ import {
   saveTelegramSession,
   listDueTelegramReminders,
   markReminderSent,
+  redeemTelegramLinkCode,
 } from "./db";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
 
@@ -174,10 +175,19 @@ export function registerTelegramWebhook(app: Express) {
       const message = update?.message;
       if (!message?.chat?.id) return;
       const chatId = String(message.chat.id);
-      const vet = await getVeterinarianByTelegramChat(chatId);
-      if (!vet) return;
       const rawText = message.text || message.caption;
       let text = rawText as string | undefined;
+      const parsed = text ? parseTelegramCommand(text) : undefined;
+      if (parsed?.command === "/vincular") {
+        const linked = await redeemTelegramLinkCode(parsed.args[0] || "", chatId);
+        await sendMessage(chatId, linked ? `Chat vinculado com sucesso para ${linked.displayName || "o veterinário"}. Envie /ajuda para começar.` : "Código inválido ou expirado. Gere um novo código na plataforma.");
+        return;
+      }
+      const vet = await getVeterinarianByTelegramChat(chatId);
+      if (!vet) {
+        if (parsed?.command === "/start" || parsed?.command === "/ajuda" || parsed?.command === "/help") await sendMessage(chatId, "Bot TechVet ativo. Para vincular este chat, gere um código na plataforma e envie: /vincular CODIGO");
+        return;
+      }
       let audioKey: string | undefined;
       if (!text && (message.voice || message.audio)) {
         const transcription = await transcribeTelegramVoice(message, chatId, vet.userId, vet.organizationId);

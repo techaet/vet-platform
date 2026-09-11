@@ -26,6 +26,7 @@ import {
 } from "../drizzle/schema";
 import { parseMarkdown } from "./markdownImport";
 import { ENV } from "./_core/env";
+import { createHash, randomBytes } from "node:crypto";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -280,6 +281,30 @@ export async function setVeterinarianTelegramChat(userId: number, organizationId
   await db.update(veterinarianProfiles).set({ telegramChatId, updatedAt: new Date() }).where(and(eq(veterinarianProfiles.userId, userId), eq(veterinarianProfiles.organizationId, organizationId)));
   const rows = await db.select().from(veterinarianProfiles).where(and(eq(veterinarianProfiles.userId, userId), eq(veterinarianProfiles.organizationId, organizationId))).limit(1);
   return rows[0];
+}
+
+function linkCodeHash(code: string) {
+  return createHash("sha256").update(code.trim().toUpperCase()).digest("hex");
+}
+
+export async function createTelegramLinkCode(userId: number, organizationId: number) {
+  await requireOrganizationMember(userId, organizationId);
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const code = randomBytes(4).toString("hex").toUpperCase();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+  await db.update(veterinarianProfiles).set({ telegramLinkCodeHash: linkCodeHash(code), telegramLinkCodeExpiresAt: expiresAt, updatedAt: new Date() }).where(and(eq(veterinarianProfiles.userId, userId), eq(veterinarianProfiles.organizationId, organizationId)));
+  return { code, expiresAt };
+}
+
+export async function redeemTelegramLinkCode(code: string, telegramChatId: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select().from(veterinarianProfiles).where(and(eq(veterinarianProfiles.telegramLinkCodeHash, linkCodeHash(code)), gte(veterinarianProfiles.telegramLinkCodeExpiresAt, new Date()))).limit(1);
+  const profile = rows[0];
+  if (!profile) return undefined;
+  await db.update(veterinarianProfiles).set({ telegramChatId, telegramLinkCodeHash: null, telegramLinkCodeExpiresAt: null, updatedAt: new Date() }).where(eq(veterinarianProfiles.id, profile.id));
+  return profile;
 }
 
 export async function saveTelegramMessage(input: { telegramChatId: string; telegramMessageId?: number; organizationId?: number; veterinarianUserId?: number; direction: "inbound" | "outbound"; messageType: string; text?: string; rawPayload?: string }) {
