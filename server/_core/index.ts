@@ -8,7 +8,8 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { registerTelegramWebhook } from "../telegram";
+import { processTelegramReminders, registerTelegramWebhook } from "../telegram";
+import { sdk } from "./sdk";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,6 +39,16 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   registerTelegramWebhook(app);
+  app.post("/api/scheduled/telegram-reminders", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+      return res.json({ ok: true, ...(await processTelegramReminders()) });
+    } catch (error) {
+      console.error("[Scheduled] telegram reminders error", error);
+      return res.status(500).json({ error: String(error), timestamp: new Date().toISOString() });
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",

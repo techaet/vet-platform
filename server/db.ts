@@ -16,6 +16,7 @@ import {
   patientAttachments,
   patients,
   appointments,
+  appointmentReminders,
   ownerObservations,
   telegramMessages,
   telegramSessions,
@@ -308,8 +309,29 @@ export async function createTelegramAppointment(input: { organizationId: number;
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   const result = await db.insert(appointments).values({ ...input, addressText: input.addressText || null, notes: input.notes || null });
-  const rows = await db.select().from(appointments).where(eq(appointments.id, Number(result[0].insertId))).limit(1);
+  const appointmentId = Number(result[0].insertId);
+  const reminderAt = new Date(input.scheduledAt.getTime() - 30 * 60 * 1000);
+  await db.insert(appointmentReminders).values({ appointmentId, channel: "telegram", reminderType: "vet_30m", scheduledFor: reminderAt, status: "pending" });
+  const rows = await db.select().from(appointments).where(eq(appointments.id, appointmentId)).limit(1);
   return rows[0];
+}
+
+export async function listDueTelegramReminders(now = new Date()) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ reminder: appointmentReminders, appointment: appointments, patientName: patients.name, ownerName: owners.name, chatId: veterinarianProfiles.telegramChatId, veterinarianName: veterinarianProfiles.displayName })
+    .from(appointmentReminders)
+    .innerJoin(appointments, eq(appointmentReminders.appointmentId, appointments.id))
+    .innerJoin(veterinarianProfiles, eq(appointments.veterinarianUserId, veterinarianProfiles.userId))
+    .innerJoin(patients, eq(appointments.patientId, patients.id))
+    .innerJoin(owners, eq(appointments.ownerId, owners.id))
+    .where(and(eq(appointmentReminders.channel, "telegram"), eq(appointmentReminders.status, "pending"), lte(appointmentReminders.scheduledFor, now)));
+}
+
+export async function markReminderSent(reminderId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(appointmentReminders).set({ status: "sent", sentAt: new Date() }).where(eq(appointmentReminders.id, reminderId));
 }
 
 export async function listAppointments(userId: number, organizationId: number, from?: Date, to?: Date) {

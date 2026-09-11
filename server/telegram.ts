@@ -13,6 +13,8 @@ import {
   listOwnerPatients,
   saveTelegramMessage,
   saveTelegramSession,
+  listDueTelegramReminders,
+  markReminderSent,
 } from "./db";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
 
@@ -189,4 +191,22 @@ export function registerTelegramWebhook(app: Express) {
       console.error("[Telegram] webhook error", error);
     }
   });
+}
+
+export async function processTelegramReminders() {
+  const due = await listDueTelegramReminders();
+  let sent = 0;
+  for (const item of due) {
+    if (!item.chatId) continue;
+    const appointmentDate = new Date(item.appointment.scheduledAt).toLocaleString("pt-BR");
+    const text = `Lembrete de consulta em 30 minutos.\n\nPaciente: ${item.patientName}\nProprietário: ${item.ownerName}\nHorário: ${appointmentDate}\nEndereço: ${item.appointment.addressText || "não informado"}`;
+    try {
+      await sendMessage(item.chatId, text);
+      await markReminderSent(item.reminder.id);
+      sent += 1;
+    } catch (error) {
+      console.error("[Telegram] reminder error", error);
+    }
+  }
+  return { processed: due.length, sent };
 }
