@@ -2,11 +2,11 @@ import type { Express, Request, Response } from "express";
 import { ENV } from "./_core/env";
 
 export async function getTelegramBotInfo() {
-  if (!ENV.telegramBotToken) return null;
+  if (!ENV.telegramBotToken) return { username: ENV.telegramBotUsername, name: "Bot Telegram" };
   const response = await fetch(`https://api.telegram.org/bot${ENV.telegramBotToken}/getMe`);
-  if (!response.ok) return null;
+  if (!response.ok) return { username: ENV.telegramBotUsername, name: "Bot Telegram" };
   const payload = await response.json() as { ok?: boolean; result?: { username?: string; first_name?: string } };
-  if (!payload.ok || !payload.result?.username) return null;
+  if (!payload.ok || !payload.result?.username) return { username: ENV.telegramBotUsername, name: "Bot Telegram" };
   return { username: payload.result.username, name: payload.result.first_name || "Bot Telegram" };
 }
 import { transcribeAudio } from "./_core/voiceTranscription";

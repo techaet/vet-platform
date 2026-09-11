@@ -8,6 +8,7 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? "vet_platform_bot",
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "",
   appUrl: process.env.APP_URL ?? "",
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
