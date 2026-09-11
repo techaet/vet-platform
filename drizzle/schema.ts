@@ -61,6 +61,21 @@ export const veterinarianProfiles = mysqlTable("veterinarianProfiles", {
   organizationUserUnique: uniqueIndex("veterinarian_profiles_org_user_unique").on(table.organizationId, table.userId),
 }));
 
+export const googleConnections = mysqlTable("googleConnections", {
+  id: int("id").autoincrement().primaryKey(),
+  organizationId: int("organizationId").notNull(),
+  userId: int("userId").notNull(),
+  googleEmail: varchar("googleEmail", { length: 320 }).notNull(),
+  accessTokenEncrypted: text("accessTokenEncrypted").notNull(),
+  refreshTokenEncrypted: text("refreshTokenEncrypted"),
+  expiresAt: timestamp("expiresAt"),
+  scopes: text("scopes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, table => ({
+  userOrgIndex: index("google_connections_user_org_index").on(table.userId, table.organizationId),
+}));
+
 export const plans = mysqlTable("plans", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
@@ -340,3 +355,4 @@ export type PrescriptionTemplate = typeof prescriptionTemplates.$inferSelect;
 export type Prescription = typeof prescriptions.$inferSelect;
 export type Appointment = typeof appointments.$inferSelect;
 export type AppointmentReminder = typeof appointmentReminders.$inferSelect;
+export type GoogleConnection = typeof googleConnections.$inferSelect;

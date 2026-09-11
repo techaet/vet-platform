@@ -25,6 +25,7 @@ import {
   setPrescriptionPdf,
   setVeterinarianTelegramChat,
   listAppointments,
+  getGoogleConnection,
 } from "./db";
 import { importMarkdownForOrganization } from "./markdownImportDb";
 import { buildPrescriptionPdf } from "./prescriptionPdf";
@@ -104,6 +105,9 @@ export const appRouter = router({
   }),
   appointment: router({
     list: protectedProcedure.input(orgId.extend({ from: z.coerce.date().optional(), to: z.coerce.date().optional() })).query(({ ctx, input }) => listAppointments(ctx.user.id, input.organizationId, input.from, input.to)),
+  }),
+  google: router({
+    status: protectedProcedure.input(orgId).query(({ ctx, input }) => getGoogleConnection(ctx.user.id, input.organizationId)),
   }),
 });
 

@@ -10,4 +10,6 @@ export const ENV = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
   telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "",
   appUrl: process.env.APP_URL ?? "",
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
 };

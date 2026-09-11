@@ -21,6 +21,7 @@ import {
   telegramMessages,
   telegramSessions,
   veterinarianProfiles,
+  googleConnections,
   users,
 } from "../drizzle/schema";
 import { parseMarkdown } from "./markdownImport";
@@ -332,6 +333,28 @@ export async function markReminderSent(reminderId: number) {
   const db = await getDb();
   if (!db) return;
   await db.update(appointmentReminders).set({ status: "sent", sentAt: new Date() }).where(eq(appointmentReminders.id, reminderId));
+}
+
+export async function getGoogleConnection(userId: number, organizationId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ id: googleConnections.id, googleEmail: googleConnections.googleEmail, scopes: googleConnections.scopes, updatedAt: googleConnections.updatedAt })
+    .from(googleConnections)
+    .where(and(eq(googleConnections.userId, userId), eq(googleConnections.organizationId, organizationId)))
+    .limit(1);
+  return rows[0];
+}
+
+export async function saveGoogleConnection(input: { userId: number; organizationId: number; googleEmail: string; accessTokenEncrypted: string; refreshTokenEncrypted?: string | null; expiresAt?: Date | null; scopes?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const existing = await db.select({ id: googleConnections.id }).from(googleConnections).where(and(eq(googleConnections.userId, input.userId), eq(googleConnections.organizationId, input.organizationId))).limit(1);
+  if (existing[0]) {
+    await db.update(googleConnections).set({ googleEmail: input.googleEmail, accessTokenEncrypted: input.accessTokenEncrypted, refreshTokenEncrypted: input.refreshTokenEncrypted || null, expiresAt: input.expiresAt || null, scopes: input.scopes || null, updatedAt: new Date() }).where(eq(googleConnections.id, existing[0].id));
+  } else {
+    await db.insert(googleConnections).values({ ...input, refreshTokenEncrypted: input.refreshTokenEncrypted || null, expiresAt: input.expiresAt || null, scopes: input.scopes || null });
+  }
+  return getGoogleConnection(input.userId, input.organizationId);
 }
 
 export async function listAppointments(userId: number, organizationId: number, from?: Date, to?: Date) {

@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { processTelegramReminders, registerTelegramWebhook } from "../telegram";
 import { sdk } from "./sdk";
+import { registerGoogleOAuthRoutes } from "../googleOAuth";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -38,6 +39,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
+  registerGoogleOAuthRoutes(app);
   registerTelegramWebhook(app);
   app.post("/api/scheduled/telegram-reminders", async (req, res) => {
     try {
