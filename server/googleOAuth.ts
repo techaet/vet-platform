@@ -82,7 +82,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
         throw new Error(`A conta Google autorizada (${googleUser.email}) é diferente da conta logada (${currentUser.email}). Entre com a mesma conta para continuar.`);
       }
       await saveGoogleConnection({ userId: state.userId, organizationId: state.organizationId, googleEmail: googleUser.email, accessTokenEncrypted: encrypt(tokens.access_token), refreshTokenEncrypted: tokens.refresh_token ? encrypt(tokens.refresh_token) : null, expiresAt: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null, scopes: tokens.scope || GOOGLE_SCOPES.join(" ") });
-      res.type("html").send("<h1>Google conectado</h1><p>Calendar e Gmail foram autorizados. Você pode fechar esta janela e voltar ao TechVet.</p>");
+      res.redirect("/admin?google=connected");
     } catch (error) {
       console.error("[Google OAuth] callback error", error);
       res.status(500).type("html").send(`<h1>Falha na conexão Google</h1><p>${String(error)}</p>`);
